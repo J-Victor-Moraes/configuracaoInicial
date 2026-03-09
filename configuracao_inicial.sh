@@ -70,7 +70,7 @@ sudo -u user sed -i 's|"value": "linuxmint-logo-ring-symbolic"|"value": "/home/u
 ############################################
 
 wget -O pdv.deb "https://drive.usercontent.google.com/download?id=1TEzZk55Xk5sDWYC_YqhxRamKw-LS5EAc&export=download&authuser=0&confirm=t&uuid=9224594e-c815-4ce2-b645-9afa386817a2&at=AGN2oQ2LrFENKJ1l-McldWSCrq09:1773089697757"
-sudo apt install -y ./pdv_5.3.3-1_amd64.deb &&\
+sudo apt install -y ./pdv.deb &&\
 sudo cp -r /opt/pdv/lib/* /usr/lib &&\
 sudo nano /usr/lib/CONFITLS.INI
 
