@@ -5,44 +5,55 @@ USER_ID=$(id -u $USER_NAME)
 IMAGE_PATH="/home/$USER_NAME/imagens_sistema/capa.png"
 
 echo "Iniciando configuracao..."
+sleep 5
 
 ############################################
 # DESATIVAR SUSPENSAO
 ############################################
 
-sudo -u user gsettings set org.cinnamon.settings-daemon.plugins.power sleep-display-ac 0
-sudo -u user gsettings set org.cinnamon.settings-daemon.plugins.power sleep-display-battery 0
+echo "Configurando a suspensão de tela"
+sleep 5
+gsettings set org.cinnamon.settings-daemon.plugins.power sleep-display-ac 0
+gsettings set org.cinnamon.settings-daemon.plugins.power sleep-display-battery 0
 
-sudo -u user gsettings set org.cinnamon.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
-sudo -u user gsettings set org.cinnamon.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
+gsettings set org.cinnamon.desktop.session idle-delay 0
+gsettings set org.cinnamon.desktop.screensaver lock-enabled false
+gsettings set org.cinnamon.settings-daemon.plugins.power lock-on-suspend false
+echo "Configuração de tela finalizada"
+sleep 5
 
 ############################################
 # GRUPOS
 ############################################
 
 echo "Executando as permissões necessárias para o usuário user"
+sleep 5
 sudo adduser user lp
 sudo adduser user tty
 sudo adduser user dialout &&\
 echo "Finalizado as permissões"
+sleep 5
 
 ############################################
 # PERMISSAO USB
 ############################################
 
 echo "Executando as permissões na porta da impressora"
+sleep 5
 sudo chmod -Rf 777 /dev/usb/lp1
 sudo chmod -Rf 777 /dev/ttyS0
 sudo chmod -Rf 777 /dev/ttyS1
 sudo chmod -Rf 777 /dev/ttyACM0
 sudo chmod -Rf 777 /dev/usb/lp0 &&\
 echo "Permissão realizada com sucesso"
+sleep 5
 
 ############################################
 # EXECUTANDO O ANYDESK AO INICIAR O COMPUTADOR
 ############################################
 
 echo "Executando o anydesk ao iniciar o computador"
+sleep 5
 sudo apt remove anydesk -y
 sudo apt update
 sudo apt install anydesk -y
@@ -50,15 +61,18 @@ sudo systemctl enable anydesk
 sudo systemctl start anydesk 
 echo "full@time15" | sudo anydesk --set-password &&\
 echo "Anydesk configurado de forma correta"
+sleep 5
 
 ############################################
 # INSTALACAO DO SSH E NET-TOOLS
 ############################################
 
 echo "Executando a instalação do net-tools e ssh"
+sleep 5
 sudo apt install net-tools &&\
 sudo apt install ssh &&\
 echo "Instalação das Ferramentas de rede realizada com sucesso"
+sleep 5
 
 ############################################
 # DIRETORIO IMAGENS
@@ -80,6 +94,7 @@ chown -R user:user /home/user/imagens_sistema
 ############################################
 
 echo "Definindo wallpapper e ícone de menu"
+sleep 5
 sudo -u $USER_NAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" \
 gsettings set org.cinnamon.desktop.background picture-uri "file://$IMAGE_PATH"
 
@@ -90,12 +105,14 @@ gsettings set org.cinnamon.desktop.background picture-uri "file://$IMAGE_PATH"
 sudo -u user sed -i 's|"value": "linuxmint-logo-ring-symbolic"|"value": "/home/user/imagens_sistema/logo.png"|' \
 /home/user/.config/cinnamon/spices/menu@cinnamon.org/0.json
 echo "Finalizado as configurações de imagens"
+sleep 5
 
 ############################################
 # INSTALACAO PDV 
 ############################################
 
 echo "Instalação a atualização do PDV"
+sleep 5
 wget -O pdv.deb "https://drive.usercontent.google.com/download?id=1TEzZk55Xk5sDWYC_YqhxRamKw-LS5EAc&export=download&authuser=0&confirm=t&uuid=9224594e-c815-4ce2-b645-9afa386817a2&at=AGN2oQ2LrFENKJ1l-McldWSCrq09:1773089697757"
 sudo apt install -y ./pdv.deb &&\
 sudo cp -r /opt/pdv/lib/* /usr/lib &&\
