@@ -20,9 +20,11 @@ sudo -u user gsettings set org.cinnamon.settings-daemon.plugins.power sleep-inac
 # GRUPOS
 ############################################
 
+echo "Executando as permissões necessárias para o usuário user"
 sudo adduser user lp
 sudo adduser user tty
-sudo adduser user dialout
+sudo adduser user dialout &&\
+echo "Finalizado as permissões"
 
 ############################################
 # PERMISSAO USB
