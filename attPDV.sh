@@ -6,32 +6,7 @@ PACOTE="pdv"
 CAMINHO_INI="/opt/pdv/pdv.ini"
 BACKUP_INI="$HOME/pdv.ini"
 
-# Função para configuração do TEF (Executada após a instalação)
-configurar_tef() {
-    echo ""
-    echo "=========================================="
-    echo "       CONFIGURAÇÃO ADICIONAL TEF"
-    echo "=========================================="
-    read -p "Possui TEF? (s/N): " POSSUI_TEF
-    
-    if [[ "$POSSUI_TEF" =~ ^([sS])$ ]]; then
-        echo "------------------------------------------"
-        echo "Configurando TLS..."
-        
-        # Comando: copiar libs e abrir configuração
-        echo "Copiando bibliotecas para /usr/lib..."
-        sudo cp -r /opt/pdv/lib/* /usr/lib
-        
-        echo "Abrindo configuração TLS..."
-        sudo nano /usr/lib/CONFITLS.INI
-    fi
-    
-    echo "------------------------------------------"
-    echo "Processo finalizado com sucesso!"
-    exit 0
-}
-
-# Função para realizar a instalação padrão
+# Função para realizar a instalação
 instalar_pacote() {
     local url=$1
     local versao=$2
@@ -44,6 +19,7 @@ instalar_pacote() {
         return
     fi
 
+    # ENCERRA O PDV ANTES DE QUALQUER COISA
     echo "Encerrando processos do PDV para garantir a instalação..."
     sudo pkill -9 -f "$PACOTE" 2>/dev/null
     sleep 1
@@ -76,7 +52,8 @@ instalar_pacote() {
         sudo chmod 666 "$CAMINHO_INI"
     fi
 
-    configurar_tef
+    echo "Processo finalizado com sucesso!"
+    exit 0
 }
 
 while true; do
@@ -86,15 +63,17 @@ while true; do
     echo "=========================================="
     echo "Buscando informações no GitHub..."
 
-    # Captura das versões
+    # Captura da versão LATEST (Estável)
     JSON_LATEST=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest")
     VER_LATEST=$(echo "$JSON_LATEST" | grep -m 1 '"tag_name":' | cut -d'"' -f4 | tr -d 'v')
     URL_LATEST=$(echo "$JSON_LATEST" | grep "browser_download_url" | grep ".deb" | head -n 1 | cut -d'"' -f4)
 
+    # Captura da versão BETA (Primeira da lista de releases)
     JSON_BETA=$(curl -sL "https://api.github.com/repos/$REPO/releases")
     VER_BETA=$(echo "$JSON_BETA" | grep -m 1 '"tag_name":' | cut -d'"' -f4 | tr -d 'v')
     URL_BETA=$(echo "$JSON_BETA" | grep "browser_download_url" | grep ".deb" | head -n 1 | cut -d'"' -f4)
 
+    # Versão instalada localmente
     VER_LOCAL=$(dpkg-query -W -f='${Version}' "$PACOTE" 2>/dev/null | xargs)
 
     clear
@@ -114,7 +93,8 @@ while true; do
     echo "=========================================="
     
     if [ -z "$VER_LATEST" ] && [ -z "$VER_BETA" ]; then
-        echo "AVISO: Problema na conexão com GitHub. Tentando em 5s..."
+        echo "AVISO: Não foi possível conectar ao GitHub ou atingiu limite de busca."
+        echo "Tentando novamente em 5 segundos..."
         sleep 5
         continue
     fi
@@ -123,7 +103,7 @@ while true; do
 
     case $OPCAO in
         1)
-            [ -z "$URL_LATEST" ] && echo "Erro: Versão Estável sem .deb" && sleep 2 && continue
+            [ -z "$URL_LATEST" ] && echo "Erro: Versão Estável sem arquivo .deb" && sleep 2 && continue
             if [ "$VER_LATEST" == "$VER_LOCAL" ]; then
                 read -p "Versão idêntica. Reinstalar? (s/N): " RESP
                 [[ ! "$RESP" =~ ^([sS])$ ]] && continue
@@ -131,7 +111,7 @@ while true; do
             instalar_pacote "$URL_LATEST" "$VER_LATEST"
             ;;
         2)
-            [ -z "$URL_BETA" ] && echo "Erro: Versão Beta sem .deb" && sleep 2 && continue
+            [ -z "$URL_BETA" ] && echo "Erro: Versão Beta sem arquivo .deb" && sleep 2 && continue
             if [ "$VER_BETA" == "$VER_LOCAL" ]; then
                 read -p "Versão idêntica. Reinstalar? (s/N): " RESP
                 [[ ! "$RESP" =~ ^([sS])$ ]] && continue
@@ -147,9 +127,11 @@ while true; do
             read -p "Escolha: " OPCAO_DOWN
             
             if [ "$OPCAO_DOWN" == "1" ]; then
-                URL_ALVO="$URL_LATEST"; VER_ALVO="$VER_LATEST"
+                URL_ALVO="$URL_LATEST"
+                VER_ALVO="$VER_LATEST"
             elif [ "$OPCAO_DOWN" == "2" ]; then
-                URL_ALVO="$URL_BETA"; VER_ALVO="$VER_BETA"
+                URL_ALVO="$URL_BETA"
+                VER_ALVO="$VER_BETA"
             else
                 echo "Opção inválida!" && sleep 2 && continue
             fi
@@ -160,24 +142,31 @@ while true; do
             wget -q --show-progress --no-cache -O pdv.deb "$URL_ALVO"
 
             if [ ! -s pdv.deb ]; then
-                echo "ERRO: Falha no download." && sleep 3 && continue
+                echo "ERRO: Falha ao baixar o arquivo. O sistema não foi alterado."
+                sleep 3 && continue
             fi
 
-            # Passo 2: Confirmação
+            # Passo 2: Confirmação de segurança
+            echo ""
             echo "--------------------------------------------------------"
             echo "AVISO: O arquivo da versão $VER_ALVO foi baixado."
             echo "Ao prosseguir, o sistema encerrará o PDV e limpará tudo."
             echo "--------------------------------------------------------"
             read -p "Deseja realizar o Downgrade/Limpeza agora? (s/N): " CONFIRM
             if [[ ! "$CONFIRM" =~ ^([sS])$ ]]; then
-                echo "Operação cancelada." && rm -f pdv.deb && sleep 2 && continue
+                echo "Operação cancelada. O arquivo baixado foi removido."
+                rm -f pdv.deb
+                sleep 2 && continue
             fi
 
             # Passo 3: Encerramento e Limpeza
-            echo "Passo 2/4: Encerrando processos e limpando sistema..."
+            echo "Passo 2/4: Encerrando processos do PDV..."
             sudo pkill -9 -f "$PACOTE" 2>/dev/null
             sleep 1
+
+            echo "Passo 3/4: Fazendo backup do pdv.ini e limpando /opt/pdv..."
             [ -f "$CAMINHO_INI" ] && cp "$CAMINHO_INI" "$BACKUP_INI"
+            
             sudo apt remove "$PACOTE" -y
             sudo rm -rf /opt/pdv
             
@@ -194,9 +183,14 @@ while true; do
                 sudo chmod 666 "$CAMINHO_INI"
             fi
 
-            configurar_tef
+            echo "Downgrade concluído com sucesso!"
+            exit 0
             ;;
-        4) echo "Saindo..."; exit 0 ;;
-        *) echo "Opção inválida!"; sleep 1 ;;
+        4)
+            echo "Saindo..."; exit 0
+            ;;
+        *)
+            echo "Opção inválida!"; sleep 1
+            ;;
     esac
 done
