@@ -12,3 +12,5 @@ wget -O pdv.deb "$URL"
 
 # 3. Executa a instalação usando o novo nome
 sudo apt install ./pdv.deb -y
+
+
