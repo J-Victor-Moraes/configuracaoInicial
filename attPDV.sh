@@ -6,22 +6,42 @@ PACOTE="pdv"
 CAMINHO_INI="/opt/pdv/pdv.ini"
 BACKUP_INI="$HOME/pdv.ini"
 
+# Função para configuração do TEF
+configurar_tef() {
+    echo ""
+    echo "=========================================="
+    echo "       CONFIGURAÇÃO ADICIONAL TEF"
+    echo "=========================================="
+    read -p "Possui TEF? (s/N): " POSSUI_TEF
+    
+    if [[ "$POSSUI_TEF" =~ ^([sS])$ ]]; then
+        echo "------------------------------------------"
+        echo "Configurando TLS..."
+        echo "Copiando bibliotecas para /usr/lib..."
+        sudo cp -r /opt/pdv/lib/* /usr/lib
+        echo "Abrindo configuração TLS..."
+        sudo nano /usr/lib/CONFITLS.INI
+    fi
+    
+    echo "------------------------------------------"
+    echo "Processo finalizado com sucesso!"
+    exit 0
+}
+
 # Função para realizar a instalação
 instalar_pacote() {
     local url=$1
     local versao=$2
     
     if [ -z "$url" ] || [ "$url" == "null" ]; then
-        echo "------------------------------------------"
-        echo "ERRO: Link de download não encontrado para a versão $versao."
-        echo "------------------------------------------"
+        echo "ERRO: Link de download não encontrado."
         sleep 3
         return
     fi
 
-    # ENCERRA O PDV ANTES DE QUALQUER COISA
-    echo "Encerrando processos do PDV para garantir a instalação..."
-    sudo pkill -9 -f "$PACOTE" 2>/dev/null
+    echo "Encerrando apenas processos do executável PDV..."
+    # MATA APENAS O BINÁRIO USANDO FILTRO DE PID
+    sudo ps aux | grep "/opt/pdv/pdv" | grep -v grep | awk '{print $2}' | xargs -r sudo kill -9 2>/dev/null
     sleep 1
 
     echo "------------------------------------------"
@@ -35,7 +55,7 @@ instalar_pacote() {
     wget -q --show-progress --no-cache -O pdv.deb "$url"
     
     if [ ! -s pdv.deb ]; then
-        echo "ERRO: O download falhou ou o arquivo está vazio."
+        echo "ERRO: O download falhou."
         sleep 3
         return
     fi
@@ -52,8 +72,7 @@ instalar_pacote() {
         sudo chmod 666 "$CAMINHO_INI"
     fi
 
-    echo "Processo finalizado com sucesso!"
-    exit 0
+    configurar_tef
 }
 
 while true; do
@@ -63,17 +82,14 @@ while true; do
     echo "=========================================="
     echo "Buscando informações no GitHub..."
 
-    # Captura da versão LATEST (Estável)
     JSON_LATEST=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest")
     VER_LATEST=$(echo "$JSON_LATEST" | grep -m 1 '"tag_name":' | cut -d'"' -f4 | tr -d 'v')
     URL_LATEST=$(echo "$JSON_LATEST" | grep "browser_download_url" | grep ".deb" | head -n 1 | cut -d'"' -f4)
 
-    # Captura da versão BETA (Primeira da lista de releases)
     JSON_BETA=$(curl -sL "https://api.github.com/repos/$REPO/releases")
     VER_BETA=$(echo "$JSON_BETA" | grep -m 1 '"tag_name":' | cut -d'"' -f4 | tr -d 'v')
     URL_BETA=$(echo "$JSON_BETA" | grep "browser_download_url" | grep ".deb" | head -n 1 | cut -d'"' -f4)
 
-    # Versão instalada localmente
     VER_LOCAL=$(dpkg-query -W -f='${Version}' "$PACOTE" 2>/dev/null | xargs)
 
     clear
@@ -92,105 +108,44 @@ while true; do
     echo "4) Sair"
     echo "=========================================="
     
-    if [ -z "$VER_LATEST" ] && [ -z "$VER_BETA" ]; then
-        echo "AVISO: Não foi possível conectar ao GitHub ou atingiu limite de busca."
-        echo "Tentando novamente em 5 segundos..."
-        sleep 5
-        continue
-    fi
-
     read -p "Escolha uma opção: " OPCAO
 
     case $OPCAO in
         1)
-            [ -z "$URL_LATEST" ] && echo "Erro: Versão Estável sem arquivo .deb" && sleep 2 && continue
-            if [ "$VER_LATEST" == "$VER_LOCAL" ]; then
-                read -p "Versão idêntica. Reinstalar? (s/N): " RESP
-                [[ ! "$RESP" =~ ^([sS])$ ]] && continue
-            fi
+            [ "$VER_LATEST" == "$VER_LOCAL" ] && read -p "Reinstalar? (s/N): " RESP && [[ ! "$RESP" =~ ^([sS])$ ]] && continue
             instalar_pacote "$URL_LATEST" "$VER_LATEST"
             ;;
         2)
-            [ -z "$URL_BETA" ] && echo "Erro: Versão Beta sem arquivo .deb" && sleep 2 && continue
-            if [ "$VER_BETA" == "$VER_LOCAL" ]; then
-                read -p "Versão idêntica. Reinstalar? (s/N): " RESP
-                [[ ! "$RESP" =~ ^([sS])$ ]] && continue
-            fi
+            [ "$VER_BETA" == "$VER_LOCAL" ] && read -p "Reinstalar? (s/N): " RESP && [[ ! "$RESP" =~ ^([sS])$ ]] && continue
             instalar_pacote "$URL_BETA" "$VER_BETA"
             ;;
         3)
-            echo ""
             echo ">>> MODO DOWNGRADE / LIMPEZA TOTAL <<<"
-            echo "Qual versão deseja baixar para o Downgrade?"
-            echo "1) Estável ($VER_LATEST)"
-            echo "2) Teste ($VER_BETA)"
-            read -p "Escolha: " OPCAO_DOWN
+            read -p "1) Estável ou 2) Teste? " OPCAO_DOWN
+            [ "$OPCAO_DOWN" == "1" ] && { URL_ALVO="$URL_LATEST"; VER_ALVO="$VER_LATEST"; } || { URL_ALVO="$URL_BETA"; VER_ALVO="$VER_BETA"; }
             
-            if [ "$OPCAO_DOWN" == "1" ]; then
-                URL_ALVO="$URL_LATEST"
-                VER_ALVO="$VER_LATEST"
-            elif [ "$OPCAO_DOWN" == "2" ]; then
-                URL_ALVO="$URL_BETA"
-                VER_ALVO="$VER_BETA"
-            else
-                echo "Opção inválida!" && sleep 2 && continue
-            fi
-
-            # Passo 1: Download antecipado
-            echo "Passo 1/4: Baixando arquivo .deb..."
             rm -f pdv.deb
             wget -q --show-progress --no-cache -O pdv.deb "$URL_ALVO"
+            [ ! -s pdv.deb ] && continue
 
-            if [ ! -s pdv.deb ]; then
-                echo "ERRO: Falha ao baixar o arquivo. O sistema não foi alterado."
-                sleep 3 && continue
-            fi
+            read -p "Confirmar limpeza e downgrade? (s/N): " CONFIRM
+            [[ ! "$CONFIRM" =~ ^([sS])$ ]] && continue
 
-            # Passo 2: Confirmação de segurança
-            echo ""
-            echo "--------------------------------------------------------"
-            echo "AVISO: O arquivo da versão $VER_ALVO foi baixado."
-            echo "Ao prosseguir, o sistema encerrará o PDV e limpará tudo."
-            echo "--------------------------------------------------------"
-            read -p "Deseja realizar o Downgrade/Limpeza agora? (s/N): " CONFIRM
-            if [[ ! "$CONFIRM" =~ ^([sS])$ ]]; then
-                echo "Operação cancelada. O arquivo baixado foi removido."
-                rm -f pdv.deb
-                sleep 2 && continue
-            fi
-
-            # Passo 3: Encerramento e Limpeza
-            echo "Passo 2/4: Encerrando processos do PDV..."
-            sudo pkill -9 -f "$PACOTE" 2>/dev/null
+            # MATA APENAS O BINÁRIO AQUI TAMBÉM
+            sudo ps aux | grep "/opt/pdv/pdv" | grep -v grep | awk '{print $2}' | xargs -r sudo kill -9 2>/dev/null
             sleep 1
 
-            echo "Passo 3/4: Fazendo backup do pdv.ini e limpando /opt/pdv..."
             [ -f "$CAMINHO_INI" ] && cp "$CAMINHO_INI" "$BACKUP_INI"
-            
             sudo apt remove "$PACOTE" -y
             sudo rm -rf /opt/pdv
             
-            # Passo 4: Instalação
-            echo "Passo 4/4: Instalando versão $VER_ALVO..."
             chmod 644 pdv.deb
             sudo dpkg -i ./pdv.deb
             sudo apt-get install -f -y
-            
-            if [ -f "$BACKUP_INI" ]; then
-                echo "Restaurando pdv.ini..."
-                sudo mkdir -p /opt/pdv
-                sudo cp "$BACKUP_INI" "$CAMINHO_INI"
-                sudo chmod 666 "$CAMINHO_INI"
-            fi
-
-            echo "Downgrade concluído com sucesso!"
-            exit 0
+            [ -f "$BACKUP_INI" ] && { sudo mkdir -p /opt/pdv; sudo cp "$BACKUP_INI" "$CAMINHO_INI"; sudo chmod 666 "$CAMINHO_INI"; }
+            configurar_tef
             ;;
-        4)
-            echo "Saindo..."; exit 0
-            ;;
-        *)
-            echo "Opção inválida!"; sleep 1
-            ;;
+        4) exit 0 ;;
+        *) sleep 1 ;;
     esac
 done
