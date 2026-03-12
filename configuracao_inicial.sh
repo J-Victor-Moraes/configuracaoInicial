@@ -115,8 +115,6 @@ echo "Instalando ou atualizando do PDV"
 sleep 1
 sudo ./attPDV.sh
 sleep 1
-sudo cp -r /opt/pdv/lib/* /usr/lib &&\
-sudo nano /usr/lib/CONFITLS.INI
 echo "PDV atualizado"
 
 echo "Configuracao finalizada!"
