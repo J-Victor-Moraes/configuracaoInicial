@@ -38,16 +38,27 @@ sleep 1
 # PERMISSAO USB
 ############################################
 
-echo "Executando as permissões na porta da impressora"
-sleep 1
-sudo chmod -Rf 777 /dev/usb/lp1
-sudo chmod -Rf 777 /dev/ttyS0
-sudo chmod -Rf 777 /dev/ttyS1
-sudo chmod -Rf 777 /dev/ttyACM0
-sudo chmod -Rf 777 /dev/usb/lp0 &&\
-echo "Permissão realizada com sucesso"
+echo "Buscando porta da impressora conectada..."
 sleep 1
 
+# 1. Tenta identificar impressoras USB (lp0, lp1, etc)
+PRINTER_PORT=$(ls /dev/usb/lp* 2>/dev/null | head -n 1)
+
+# 2. Se não achou USB, tenta identificar adaptadores Serial/USB (ttyACM, ttyUSB)
+if [ -z "$PRINTER_PORT" ]; then
+    # Procura por dispositivos que o sistema identifica como impressora no dmesg ou udev
+    PRINTER_PORT=$(ls /dev/ttyACM* 2>/dev/null | head -n 1)
+fi
+
+# 3. Verifica se alguma porta foi encontrada
+if [ -n "$PRINTER_PORT" ]; then
+    echo "Impressora detectada em: $PRINTER_PORT"
+    sudo chmod 666 "$PRINTER_PORT"
+    echo "Permissão aplicada com sucesso em $PRINTER_PORT"
+else
+    echo "Erro: Nenhuma impressora foi detectada nas portas USB ou ACM."
+fi
+sleep 1
 ############################################
 # EXECUTANDO O ANYDESK AO INICIAR O COMPUTADOR
 ############################################
